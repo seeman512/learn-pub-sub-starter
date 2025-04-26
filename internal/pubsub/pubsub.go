@@ -63,5 +63,10 @@ func DeclareAndBind(
 		return nil, queue, err
 	}
 
+	err = ch.QueueBind(queueName, key, exchange, false, nil)
+	if err != nil {
+		return nil, queue, err
+	}
+
 	return ch, queue, nil
 }

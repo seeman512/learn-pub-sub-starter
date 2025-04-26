@@ -54,7 +54,7 @@ func GetInput() []string {
 		return nil
 	}
 	line := scanner.Text()
-	line = strings.TrimSpace(line)
+	line = strings.ToLower(strings.TrimSpace(line))
 	return strings.Fields(line)
 }
 

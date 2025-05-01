@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -66,22 +67,12 @@ func handleWar(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.Recogni
 		}
 
 		switch warOutcome {
-		case gamelogic.WarOutcomeNotInvolved:
-			// returnVal = pubsub.NackRequeue
-		case gamelogic.WarOutcomeNoUnits:
-			// returnVal = pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
-			// returnVal = pubsub.Ack
 			log.Message = fmt.Sprintf("%s won a war against %s", opponentName, userName)
 		case gamelogic.WarOutcomeYouWon:
-			// returnVal = pubsub.Ack
 			log.Message = fmt.Sprintf("%s won a war against %s", userName, opponentName)
 		case gamelogic.WarOutcomeDraw:
-			// returnVal = pubsub.Ack
 			log.Message = fmt.Sprintf("A war between %s and %s resulted in a draw", userName, opponentName)
-		default:
-			fmt.Printf("Wrong outcome: %v\n", warOutcome)
-			//returnVal = pubsub.NackDiscard
 		}
 
 		topicKey := routing.GameLogSlug + "." + opponentName
@@ -124,6 +115,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	gameState := gamelogic.NewGameState(username)
+	logger := gamelogic.Logger{Username: username, Debug: true}
+
+	// Direct exchenge
 	queueName := routing.PauseKey + "." + username
 	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueName,
 		routing.PauseKey, pubsub.Transient)
@@ -132,9 +127,6 @@ func main() {
 		fmt.Printf("Declare and bind error %v\n", err)
 		os.Exit(1)
 	}
-
-	gameState := gamelogic.NewGameState(username)
-	logger := gamelogic.Logger{Username: username, Debug: true}
 
 	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, queueName,
 		routing.PauseKey, pubsub.Transient, handlerPause(gameState))
@@ -166,7 +158,6 @@ func main() {
 
 	commands := map[string]func(args []string) bool{
 		"spawn": func(args []string) bool {
-			fmt.Printf("ARGS: %v\n", args)
 			err := gameState.CommandSpawn(args)
 			if err != nil {
 				logger.Write(fmt.Sprintf("Spawn error: %v", err))
@@ -179,7 +170,6 @@ func main() {
 				logger.Write(fmt.Sprintf("Spawn error: %v", err))
 			}
 
-			// TODO Publish ArmyMove
 			units := []gamelogic.Unit{}
 
 			for u := range args[1:] {
@@ -206,7 +196,26 @@ func main() {
 			return false
 		},
 		"spam": func(args []string) bool {
-			logger.Write("Spamming not allowed yet")
+			if len(args) < 2 {
+				fmt.Println("Requierd format: spam 100")
+				return false
+			}
+			num, err := strconv.Atoi(args[1])
+			if err != nil {
+				fmt.Printf("Convert %s error %v\n", args[1], err)
+				return false
+			}
+
+			for range num {
+
+				topicKey := routing.GameLogSlug + "." + username
+				log := routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     gamelogic.GetMaliciousLog(),
+					Username:    username,
+				}
+				pubsub.PublishGOB(ch, string(routing.ExchangePerilTopic), topicKey, log)
+			}
 			return false
 		},
 		"quit": func(args []string) bool {

@@ -112,6 +112,9 @@ func subscribe[T any](
 		return err
 	}
 
+	// limit prefetch
+	ch.Qos(10, 0, false)
+
 	deliveryCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("consume channel error: %w", err)
@@ -120,7 +123,6 @@ func subscribe[T any](
 	go func() {
 		for msg := range deliveryCh {
 			var obj T
-			// err := json.Unmarshal(msg.Body, &obj)
 			obj, err := unmarshaller(msg.Body)
 			if err != nil {
 				fmt.Printf("Unmarshall error %v\n", err)

@@ -32,15 +32,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// _, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug,
-	// 	routing.GameLogSlug+".*", pubsub.Durable)
-	// if err != nil {
-	// 	fmt.Printf("Topic exchange error: %s", err)
-	// }
-
 	// Log
 	pubsub.SubscribeGOB(conn, string(routing.ExchangePerilTopic), "game_logs",
-		routing.GameLogSlug+".*", pubsub.Transient, func(log routing.GameLog) pubsub.AckType {
+		routing.GameLogSlug+".*", pubsub.Durable, func(log routing.GameLog) pubsub.AckType {
 			defer fmt.Sprintf("Log Message: %s\n", log.Message)
 			gamelogic.WriteLog(log, false)
 			return pubsub.Ack
@@ -100,10 +94,4 @@ func main() {
 			break
 		}
 	}
-
-	// signalChan := make(chan os.Signal, 1)
-	// signal.Notify(signalChan, os.Interrupt)
-	// <-signalChan
-
-	// fmt.Println("...")
 }
